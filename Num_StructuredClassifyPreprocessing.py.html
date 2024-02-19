@@ -1,0 +1,219 @@
+<html>
+<head>
+<title>Num_StructuredClassifyPreprocessing.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #8c8c8c; font-style: italic;}
+.s1 { color: #080808;}
+.s2 { color: #0033b3;}
+.s3 { color: #067d17;}
+.s4 { color: #1750eb;}
+</style>
+</head>
+<body bgcolor="#ffffff">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#c0c0c0" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+Num_StructuredClassifyPreprocessing.py</font>
+</center></td></tr></table>
+<pre><span class="s0"># From: https://www.tensorflow.org/tutorials/structured_data/preprocessing_layers</span>
+<span class="s0">## The PetFinder.my mini dataset</span>
+
+<span class="s0">## Import TensorFlow and other libraries</span>
+<span class="s2">import </span><span class="s1">numpy </span><span class="s2">as </span><span class="s1">np</span>
+<span class="s2">import </span><span class="s1">pandas </span><span class="s2">as </span><span class="s1">pd</span>
+<span class="s2">import </span><span class="s1">tensorflow </span><span class="s2">as </span><span class="s1">tf</span>
+
+<span class="s2">from </span><span class="s1">tensorflow.keras </span><span class="s2">import </span><span class="s1">layers</span>
+
+<span class="s1">tf.__version__</span>
+
+<span class="s0">## Load the dataset and read it into a pandas DataFrame</span>
+
+<span class="s1">dataset_url = </span><span class="s3">'http://storage.googleapis.com/download.tensorflow.org/data/petfinder-mini.zip'</span>
+<span class="s1">csv_file = </span><span class="s3">'datasets/petfinder-mini/petfinder-mini.csv'</span>
+
+<span class="s1">tf.keras.utils.get_file(</span><span class="s3">'petfinder_mini.zip'</span><span class="s1">, dataset_url, extract=</span><span class="s2">True</span><span class="s1">, cache_dir=</span><span class="s3">'.'</span><span class="s1">)</span>
+<span class="s1">dataframe = pd.read_csv(csv_file)</span>
+
+<span class="s1">dataframe.head()</span>
+
+<span class="s0">## Create a target variable</span>
+<span class="s0"># In the original dataset, `'AdoptionSpeed'` of `4` indicates a pet was not adopted.</span>
+<span class="s1">dataframe[</span><span class="s3">'target'</span><span class="s1">] = np.where(dataframe[</span><span class="s3">'AdoptionSpeed'</span><span class="s1">]==</span><span class="s4">4</span><span class="s1">, </span><span class="s4">0</span><span class="s1">, </span><span class="s4">1</span><span class="s1">)</span>
+
+<span class="s0"># Drop unused features.</span>
+<span class="s1">dataframe = dataframe.drop(columns=[</span><span class="s3">'AdoptionSpeed'</span><span class="s1">, </span><span class="s3">'Description'</span><span class="s1">])</span>
+
+<span class="s0"># Split the DataFrame into training, validation, and test sets</span>
+<span class="s1">train, val, test = np.split(dataframe.sample(frac=</span><span class="s4">1</span><span class="s1">),</span>
+                            <span class="s1">[int(</span><span class="s4">0.8</span><span class="s1">*len(dataframe)),</span>
+                             <span class="s1">int(</span><span class="s4">0.9</span><span class="s1">*len(dataframe))])</span>
+
+<span class="s1">print(len(train), </span><span class="s3">'training examples'</span><span class="s1">)</span>
+<span class="s1">print(len(val), </span><span class="s3">'validation examples'</span><span class="s1">)</span>
+<span class="s1">print(len(test), </span><span class="s3">'test examples'</span><span class="s1">)</span>
+
+<span class="s0">## Create an input pipeline using tf.data</span>
+<span class="s2">def </span><span class="s1">df_to_dataset(dataframe, shuffle=</span><span class="s2">True</span><span class="s1">, batch_size=</span><span class="s4">32</span><span class="s1">):</span>
+    <span class="s1">df = dataframe.copy()</span>
+    <span class="s1">labels = df.pop(</span><span class="s3">'target'</span><span class="s1">)</span>
+    <span class="s1">df = {key: value.values[:, tf.newaxis] </span><span class="s2">for </span><span class="s1">key, value </span><span class="s2">in </span><span class="s1">dataframe.items()}</span>
+    <span class="s1">ds = tf.data.Dataset.from_tensor_slices((dict(df), labels))</span>
+    <span class="s2">if </span><span class="s1">shuffle:</span>
+        <span class="s1">ds = ds.shuffle(buffer_size=len(dataframe))</span>
+    <span class="s1">ds = ds.batch(batch_size)</span>
+    <span class="s1">ds = ds.prefetch(batch_size)</span>
+    <span class="s2">return </span><span class="s1">ds</span>
+
+<span class="s1">batch_size = </span><span class="s4">5</span>
+<span class="s1">train_ds = df_to_dataset(train, batch_size=batch_size)</span>
+
+<span class="s1">[(train_features, label_batch)] = train_ds.take(</span><span class="s4">1</span><span class="s1">)</span>
+<span class="s1">print(</span><span class="s3">'Every feature:'</span><span class="s1">, list(train_features.keys()))</span>
+<span class="s1">print(</span><span class="s3">'A batch of ages:'</span><span class="s1">, train_features[</span><span class="s3">'Age'</span><span class="s1">])</span>
+<span class="s1">print(</span><span class="s3">'A batch of targets:'</span><span class="s1">, label_batch)</span>
+
+<span class="s0">## Apply the Keras preprocessing layers</span>
+<span class="s0">### Numerical columns</span>
+<span class="s2">def </span><span class="s1">get_normalization_layer(name, dataset):</span>
+    <span class="s0"># Create a Normalization layer for teh feature.</span>
+    <span class="s1">normalizer = layers.Normalization(axis=</span><span class="s2">None</span><span class="s1">)</span>
+
+    <span class="s0"># Prepare a Dataset that only yields the feature.</span>
+    <span class="s1">feature_ds = dataset.map(</span><span class="s2">lambda </span><span class="s1">x, y: x[name])</span>
+
+    <span class="s0"># Learn the statistics of the data.</span>
+    <span class="s1">normalizer.adapt(feature_ds)</span>
+
+    <span class="s2">return </span><span class="s1">normalizer</span>
+
+<span class="s1">photo_count_col = train_features[</span><span class="s3">'PhotoAmt'</span><span class="s1">]</span>
+<span class="s1">layer = get_normalization_layer(</span><span class="s3">'PhotoAmt'</span><span class="s1">, train_ds)</span>
+<span class="s1">layer(photo_count_col)</span>
+
+<span class="s0">### Categorical columns</span>
+<span class="s2">def </span><span class="s1">get_category_encoding_layer(name, dataset, dtype, max_tokens=</span><span class="s2">None</span><span class="s1">):</span>
+    <span class="s0"># Create a layer that turns strings into integer indices.</span>
+    <span class="s2">if </span><span class="s1">dtype == </span><span class="s3">'string'</span><span class="s1">:</span>
+        <span class="s1">index = layers.StringLookup(max_tokens=max_tokens)</span>
+    <span class="s0"># Otherwise, create a layer that turns integer values into integer indices.</span>
+    <span class="s2">else</span><span class="s1">:</span>
+        <span class="s1">index = layers.IntegerLookup(max_tokens=max_tokens)</span>
+
+    <span class="s0"># Prepare a `tf.data.Dataset` that only yields the feature.</span>
+    <span class="s1">feature_ds = dataset.map(</span><span class="s2">lambda </span><span class="s1">x, y: x[name])</span>
+
+    <span class="s0"># Learn the set of possible values and assign them a fixed integer index.</span>
+    <span class="s1">index.adapt(feature_ds)</span>
+
+    <span class="s0"># Encode the integer indices.</span>
+    <span class="s1">encoder = layers.CategoryEncoding(num_tokens=index.vocabulary_size())</span>
+
+    <span class="s0"># Apply multi-hot encoding to the indices. The lambda function captures the layer,</span>
+    <span class="s0"># so you can use them, or include them in the Keras Functional model later.</span>
+    <span class="s2">return lambda </span><span class="s1">feature: encoder(index(feature))</span>
+
+<span class="s1">test_type_col = train_features[</span><span class="s3">'Type'</span><span class="s1">]</span>
+<span class="s1">test_type_layer = get_category_encoding_layer(name=</span><span class="s3">'Type'</span><span class="s1">,</span>
+                                              <span class="s1">dataset=train_ds,</span>
+                                              <span class="s1">dtype=</span><span class="s3">'string'</span><span class="s1">)</span>
+<span class="s1">test_type_layer(test_type_col)</span>
+
+<span class="s1">test_age_col = train_features[</span><span class="s3">'Age'</span><span class="s1">]</span>
+<span class="s1">test_age_layer = get_category_encoding_layer(name=</span><span class="s3">'Age'</span><span class="s1">,</span>
+                                             <span class="s1">dataset=train_ds,</span>
+                                             <span class="s1">dtype=</span><span class="s3">'int64'</span><span class="s1">,</span>
+                                             <span class="s1">max_tokens=</span><span class="s4">5</span><span class="s1">)</span>
+<span class="s1">test_age_layer(test_age_col)</span>
+
+<span class="s0">## Preprocess selected features to train the model on</span>
+<span class="s1">batch_size = </span><span class="s4">256</span>
+<span class="s1">train_ds = df_to_dataset(train, batch_size=batch_size)</span>
+<span class="s1">val_ds = df_to_dataset(val, shuffle=</span><span class="s2">False</span><span class="s1">, batch_size=batch_size)</span>
+<span class="s1">test_ds = df_to_dataset(test, shuffle=</span><span class="s2">False</span><span class="s1">, batch_size=batch_size)</span>
+
+<span class="s1">all_inputs = []</span>
+<span class="s1">encoded_features = []</span>
+
+<span class="s0"># Numerical features.</span>
+<span class="s2">for </span><span class="s1">header </span><span class="s2">in </span><span class="s1">[</span><span class="s3">'PhotoAmt'</span><span class="s1">, </span><span class="s3">'Fee'</span><span class="s1">]:</span>
+    <span class="s1">numeric_col = tf.keras.Input(shape=(</span><span class="s4">1</span><span class="s1">,), name=header)</span>
+    <span class="s1">normalization_layer = get_normalization_layer(header, train_ds)</span>
+    <span class="s1">encoded_numeric_col = normalization_layer(numeric_col)</span>
+    <span class="s1">all_inputs.append(numeric_col)</span>
+    <span class="s1">encoded_features.append(encoded_numeric_col)</span>
+
+<span class="s1">age_col = tf.keras.Input(shape=(</span><span class="s4">1</span><span class="s1">,), name=</span><span class="s3">'Age'</span><span class="s1">, dtype=</span><span class="s3">'int64'</span><span class="s1">)</span>
+
+<span class="s1">encoding_layer = get_category_encoding_layer(name=</span><span class="s3">'Age'</span><span class="s1">,</span>
+                                             <span class="s1">dataset=train_ds,</span>
+                                             <span class="s1">dtype=</span><span class="s3">'int64'</span><span class="s1">,</span>
+                                             <span class="s1">max_tokens=</span><span class="s4">5</span><span class="s1">)</span>
+<span class="s1">encoded_age_col = encoding_layer(age_col)</span>
+<span class="s1">all_inputs.append(age_col)</span>
+<span class="s1">encoded_features.append(encoded_age_col)</span>
+
+<span class="s1">categorical_cols = [</span><span class="s3">'Type'</span><span class="s1">, </span><span class="s3">'Color1'</span><span class="s1">, </span><span class="s3">'Color2'</span><span class="s1">, </span><span class="s3">'Gender'</span><span class="s1">, </span><span class="s3">'MaturitySize'</span><span class="s1">,</span>
+                    <span class="s3">'FurLength'</span><span class="s1">, </span><span class="s3">'Vaccinated'</span><span class="s1">, </span><span class="s3">'Sterilized'</span><span class="s1">, </span><span class="s3">'Health'</span><span class="s1">, </span><span class="s3">'Breed1'</span><span class="s1">]</span>
+
+<span class="s2">for </span><span class="s1">header </span><span class="s2">in </span><span class="s1">categorical_cols:</span>
+    <span class="s1">categorical_col = tf.keras.Input(shape=(</span><span class="s4">1</span><span class="s1">,), name=header, dtype=</span><span class="s3">'string'</span><span class="s1">)</span>
+    <span class="s1">encoding_layer = get_category_encoding_layer(name=header,</span>
+                                                 <span class="s1">dataset=train_ds,</span>
+                                                 <span class="s1">dtype=</span><span class="s3">'string'</span><span class="s1">,</span>
+                                                 <span class="s1">max_tokens=</span><span class="s4">5</span><span class="s1">)</span>
+    <span class="s1">encoded_categorical_col = encoding_layer(categorical_col)</span>
+    <span class="s1">all_inputs.append(categorical_col)</span>
+    <span class="s1">encoded_features.append(encoded_categorical_col)</span>
+
+<span class="s0">## Create, compile, and train the model</span>
+<span class="s1">all_features = tf.keras.layers.concatenate(encoded_features)</span>
+<span class="s1">x = tf.keras.layers.Dense(</span><span class="s4">32</span><span class="s1">, activation=</span><span class="s3">&quot;relu&quot;</span><span class="s1">)(all_features)</span>
+<span class="s1">x = tf.keras.layers.Dropout(</span><span class="s4">0.5</span><span class="s1">)(x)</span>
+<span class="s1">output = tf.keras.layers.Dense(</span><span class="s4">1</span><span class="s1">)(x)</span>
+
+<span class="s1">model = tf.keras.Model(all_inputs, output)</span>
+
+<span class="s1">model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=</span><span class="s2">True</span><span class="s1">),</span>
+              <span class="s1">optimizer=</span><span class="s3">'adam'</span><span class="s1">,</span>
+              <span class="s1">metrics=[</span><span class="s3">&quot;accuracy&quot;</span><span class="s1">])</span>
+
+<span class="s0"># Use `rankdir='LR'` to make the graph horizontal.</span>
+<span class="s0"># tf.keras.utils.plot_model(model, show_shapes=True, rankdir=&quot;LR&quot;)</span>
+
+<span class="s1">model.fit(train_ds,</span>
+          <span class="s1">epochs=</span><span class="s4">10</span><span class="s1">,</span>
+          <span class="s1">validation_data=val_ds)</span>
+
+<span class="s1">loss, accuracy = model.evaluate(test_ds)</span>
+<span class="s1">print(</span><span class="s3">&quot;Accuracy&quot;</span><span class="s1">, accuracy)</span>
+
+<span class="s0">## Perform inference</span>
+<span class="s1">model.save(</span><span class="s3">'my_pet_classifier.keras'</span><span class="s1">)</span>
+<span class="s1">reloaded_model = tf.keras.models.load_model(</span><span class="s3">'my_pet_classifier.keras'</span><span class="s1">)</span>
+
+<span class="s1">sample = {</span>
+    <span class="s3">'Type'</span><span class="s1">: </span><span class="s3">'Cat'</span><span class="s1">,</span>
+    <span class="s3">'Age'</span><span class="s1">: </span><span class="s4">3</span><span class="s1">,</span>
+    <span class="s3">'Breed1'</span><span class="s1">: </span><span class="s3">'Tabby'</span><span class="s1">,</span>
+    <span class="s3">'Gender'</span><span class="s1">: </span><span class="s3">'Male'</span><span class="s1">,</span>
+    <span class="s3">'Color1'</span><span class="s1">: </span><span class="s3">'Black'</span><span class="s1">,</span>
+    <span class="s3">'Color2'</span><span class="s1">: </span><span class="s3">'White'</span><span class="s1">,</span>
+    <span class="s3">'MaturitySize'</span><span class="s1">: </span><span class="s3">'Small'</span><span class="s1">,</span>
+    <span class="s3">'FurLength'</span><span class="s1">: </span><span class="s3">'Short'</span><span class="s1">,</span>
+    <span class="s3">'Vaccinated'</span><span class="s1">: </span><span class="s3">'No'</span><span class="s1">,</span>
+    <span class="s3">'Sterilized'</span><span class="s1">: </span><span class="s3">'No'</span><span class="s1">,</span>
+    <span class="s3">'Health'</span><span class="s1">: </span><span class="s3">'Healthy'</span><span class="s1">,</span>
+    <span class="s3">'Fee'</span><span class="s1">: </span><span class="s4">100</span><span class="s1">,</span>
+    <span class="s3">'PhotoAmt'</span><span class="s1">:</span><span class="s4">2</span>
+<span class="s1">}</span>
+
+<span class="s1">input_dict = {name: tf.convert_to_tensor([value]) </span><span class="s2">for </span><span class="s1">name, value </span><span class="s2">in </span><span class="s1">sample.items()}</span>
+<span class="s1">predictions = reloaded_model.predict(input_dict)</span>
+<span class="s1">prob = tf.nn.sigmoid(predictions[</span><span class="s4">0</span><span class="s1">])</span>
+
+<span class="s1">print(</span><span class="s3">&quot;This particular pet had a %.1f percent probability &quot;</span>
+      <span class="s3">&quot;of getting adopted.&quot; </span><span class="s1">% (</span><span class="s4">100 </span><span class="s1">* prob))</span></pre>
+</body>
+</html>

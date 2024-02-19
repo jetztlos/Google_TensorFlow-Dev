@@ -1,0 +1,217 @@
+<html>
+<head>
+<title>Text_TextClassification_Basic.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #8c8c8c; font-style: italic;}
+.s1 { color: #080808;}
+.s2 { color: #0033b3;}
+.s3 { color: #067d17;}
+.s4 { color: #1750eb;}
+</style>
+</head>
+<body bgcolor="#ffffff">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#c0c0c0" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+Text_TextClassification_Basic.py</font>
+</center></td></tr></table>
+<pre><span class="s0"># From: https://www.tensorflow.org/tutorials/keras/text_classification</span>
+<span class="s0">## Setup</span>
+<span class="s2">import </span><span class="s1">matplotlib.pyplot </span><span class="s2">as </span><span class="s1">plt</span>
+<span class="s2">import </span><span class="s1">os</span>
+<span class="s2">import </span><span class="s1">re</span>
+<span class="s2">import </span><span class="s1">shutil</span>
+<span class="s2">import </span><span class="s1">string</span>
+<span class="s2">import </span><span class="s1">tensorflow </span><span class="s2">as </span><span class="s1">tf</span>
+
+<span class="s2">from </span><span class="s1">tensorflow.keras </span><span class="s2">import </span><span class="s1">layers</span>
+<span class="s2">from </span><span class="s1">tensorflow.keras </span><span class="s2">import </span><span class="s1">losses</span>
+
+<span class="s1">print(tf.__version__)</span>
+
+<span class="s0">## Sentiment analysis</span>
+<span class="s0">### Download &amp; explore the IMDB dataset</span>
+<span class="s1">url = </span><span class="s3">&quot;https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz&quot;</span>
+
+<span class="s1">dataset = tf.keras.utils.get_file(</span><span class="s3">&quot;aclImdb_v1&quot;</span><span class="s1">, url,</span>
+                                    <span class="s1">untar=</span><span class="s2">True</span><span class="s1">, cache_dir=</span><span class="s3">'.'</span><span class="s1">,</span>
+                                    <span class="s1">cache_subdir=</span><span class="s3">''</span><span class="s1">)</span>
+
+<span class="s1">dataset_dir = os.path.join(os.path.dirname(dataset), </span><span class="s3">'aclImdb'</span><span class="s1">)</span>
+
+<span class="s1">os.listdir(dataset_dir)</span>
+
+<span class="s1">train_dir = os.path.join(dataset_dir, </span><span class="s3">'train'</span><span class="s1">)</span>
+<span class="s1">os.listdir(train_dir)</span>
+
+<span class="s1">sample_file = os.path.join(train_dir, </span><span class="s3">'pos/1181_9.txt'</span><span class="s1">)</span>
+<span class="s2">with </span><span class="s1">open(sample_file) </span><span class="s2">as </span><span class="s1">f:</span>
+  <span class="s1">print(f.read())</span>
+
+<span class="s0">### Load the dataset</span>
+<span class="s1">remove_dir = os.path.join(train_dir, </span><span class="s3">'unsup'</span><span class="s1">)</span>
+<span class="s1">shutil.rmtree(remove_dir)</span>
+
+<span class="s1">batch_size = </span><span class="s4">32</span>
+<span class="s1">seed = </span><span class="s4">42</span>
+
+<span class="s1">raw_train_ds = tf.keras.utils.text_dataset_from_directory(</span>
+    <span class="s3">'aclImdb/train'</span><span class="s1">,</span>
+    <span class="s1">batch_size=batch_size,</span>
+    <span class="s1">validation_split=</span><span class="s4">0.2</span><span class="s1">,</span>
+    <span class="s1">subset=</span><span class="s3">'training'</span><span class="s1">,</span>
+    <span class="s1">seed=seed)</span>
+
+<span class="s2">for </span><span class="s1">text_batch, label_batch </span><span class="s2">in </span><span class="s1">raw_train_ds.take(</span><span class="s4">1</span><span class="s1">):</span>
+    <span class="s2">for </span><span class="s1">i </span><span class="s2">in </span><span class="s1">range(</span><span class="s4">3</span><span class="s1">):</span>
+        <span class="s1">print(</span><span class="s3">&quot;Review&quot;</span><span class="s1">, text_batch.numpy()[i])</span>
+        <span class="s1">print(</span><span class="s3">&quot;Label&quot;</span><span class="s1">, label_batch.numpy()[i])</span>
+
+<span class="s1">print(</span><span class="s3">&quot;Label 0 corresponds to&quot;</span><span class="s1">, raw_train_ds.class_names[</span><span class="s4">0</span><span class="s1">])</span>
+<span class="s1">print(</span><span class="s3">&quot;Label 1 corresponds to&quot;</span><span class="s1">, raw_train_ds.class_names[</span><span class="s4">1</span><span class="s1">])</span>
+
+<span class="s1">raw_val_ds = tf.keras.utils.text_dataset_from_directory(</span><span class="s3">'aclImdb/train'</span><span class="s1">,</span>
+                                                        <span class="s1">batch_size=batch_size,</span>
+                                                        <span class="s1">validation_split=</span><span class="s4">0.2</span><span class="s1">,</span>
+                                                        <span class="s1">subset=</span><span class="s3">'validation'</span><span class="s1">,</span>
+                                                        <span class="s1">seed=seed)</span>
+
+<span class="s1">raw_test_ds = tf.keras.utils.text_dataset_from_directory(</span><span class="s3">'aclImdb/test'</span><span class="s1">,</span>
+                                                         <span class="s1">batch_size=batch_size)</span>
+
+<span class="s0">### Prepare the dataset for training</span>
+<span class="s2">def </span><span class="s1">custom_standardization(input_data):</span>
+    <span class="s1">lowercase = tf.strings.lower(input_data)</span>
+    <span class="s1">stripped_html = tf.strings.regex_replace(lowercase, </span><span class="s3">'&lt;br /&gt;'</span><span class="s1">, </span><span class="s3">' '</span><span class="s1">)</span>
+    <span class="s2">return </span><span class="s1">tf.strings.regex_replace(stripped_html,</span>
+                                    <span class="s3">'[%s]' </span><span class="s1">% re.escape(string.punctuation),</span>
+                                    <span class="s3">''</span><span class="s1">)</span>
+
+<span class="s1">max_features = </span><span class="s4">10_000</span>
+<span class="s1">sequence_length = </span><span class="s4">250</span>
+
+<span class="s1">vectorize_layer = layers.TextVectorization(standardize=custom_standardization,</span>
+                                           <span class="s1">max_tokens=max_features,</span>
+                                           <span class="s1">output_mode=</span><span class="s3">'int'</span><span class="s1">,</span>
+                                           <span class="s1">output_sequence_length=sequence_length)</span>
+
+<span class="s0"># Make a text-only dataset (w/o labels), then call adapt</span>
+<span class="s1">train_text = raw_train_ds.map(</span><span class="s2">lambda </span><span class="s1">x, y: x)</span>
+<span class="s1">vectorize_layer.adapt(train_text)</span>
+
+<span class="s2">def </span><span class="s1">vectorize_text(text, label):</span>
+    <span class="s1">text = tf.expand_dims(text, -</span><span class="s4">1</span><span class="s1">)</span>
+    <span class="s2">return </span><span class="s1">vectorize_layer(text), label</span>
+
+<span class="s0"># Retrieve a batch (of 32 reviews &amp; labels) from the dataset</span>
+<span class="s1">text_batch, label_batch = next(iter(raw_train_ds))</span>
+<span class="s1">first_review, first_label = text_batch[</span><span class="s4">0</span><span class="s1">], label_batch[</span><span class="s4">0</span><span class="s1">]</span>
+<span class="s1">print(</span><span class="s3">&quot;Review&quot;</span><span class="s1">, first_review)</span>
+<span class="s1">print(</span><span class="s3">&quot;Label&quot;</span><span class="s1">, raw_train_ds.class_names[first_label])</span>
+<span class="s1">print(</span><span class="s3">&quot;Vectorized review&quot;</span><span class="s1">, vectorize_text(first_review, first_label))</span>
+
+<span class="s1">print(</span><span class="s3">&quot;1287 ---&gt; &quot;</span><span class="s1">,vectorize_layer.get_vocabulary()[</span><span class="s4">1287</span><span class="s1">])</span>
+<span class="s1">print(</span><span class="s3">&quot; 313 ---&gt; &quot;</span><span class="s1">,vectorize_layer.get_vocabulary()[</span><span class="s4">313</span><span class="s1">])</span>
+<span class="s1">print(</span><span class="s3">'Vocabulary size: {}'</span><span class="s1">.format(len(vectorize_layer.get_vocabulary())))</span>
+
+<span class="s1">train_ds = raw_train_ds.map(vectorize_text)</span>
+<span class="s1">val_ds = raw_val_ds.map(vectorize_text)</span>
+<span class="s1">test_ds = raw_test_ds.map(vectorize_text)</span>
+
+<span class="s0">### Configure the dataset for performance</span>
+<span class="s1">AUTOTUNE = tf.data.AUTOTUNE</span>
+
+<span class="s1">train_ds = train_ds.cache().prefetch(buffer_size=AUTOTUNE)</span>
+<span class="s1">val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)</span>
+<span class="s1">test_ds =test_ds.cache().prefetch(buffer_size=AUTOTUNE)</span>
+
+<span class="s0">### Create the model</span>
+<span class="s1">embedding_dim = </span><span class="s4">16</span>
+
+<span class="s1">model = tf.keras.Sequential([</span>
+    <span class="s1">layers.Embedding(max_features, embedding_dim),</span>
+    <span class="s1">layers.Dropout(</span><span class="s4">0.2</span><span class="s1">),</span>
+    <span class="s1">layers.GlobalAveragePooling1D(),</span>
+    <span class="s1">layers.Dropout(</span><span class="s4">0.2</span><span class="s1">),</span>
+    <span class="s1">layers.Dense(</span><span class="s4">1</span><span class="s1">)</span>
+<span class="s1">])</span>
+
+<span class="s1">model.summary()</span>
+
+<span class="s0">### Loss function and optimizer</span>
+<span class="s1">model.compile(loss=losses.BinaryCrossentropy(from_logits=</span><span class="s2">True</span><span class="s1">),</span>
+              <span class="s1">optimizer=</span><span class="s3">'adam'</span><span class="s1">,</span>
+              <span class="s1">metrics=tf.metrics.BinaryAccuracy(threshold=</span><span class="s4">0.0</span><span class="s1">))</span>
+
+<span class="s0">### Train the model</span>
+<span class="s1">epochs = </span><span class="s4">10</span>
+<span class="s1">history = model.fit(train_ds,</span>
+                    <span class="s1">epochs=epochs,</span>
+                    <span class="s1">validation_data=val_ds)</span>
+
+<span class="s0">### Evaluate the model</span>
+<span class="s1">loss, accuracy = model.evaluate(test_ds)</span>
+
+<span class="s1">print(</span><span class="s3">&quot;Loss: &quot;</span><span class="s1">, loss)</span>
+<span class="s1">print(</span><span class="s3">&quot;Accuracy: &quot;</span><span class="s1">, accuracy)</span>
+
+<span class="s1">history_dict = history.history</span>
+<span class="s1">history_dict.keys()</span>
+
+<span class="s0"># There are 4 entries: 1 for each monitored metric during training, and validation -- Loss</span>
+<span class="s1">acc = history_dict[</span><span class="s3">'binary_accuracy'</span><span class="s1">]</span>
+<span class="s1">val_acc = history_dict[</span><span class="s3">'val_binary_accuracy'</span><span class="s1">]</span>
+<span class="s1">loss = history_dict[</span><span class="s3">'loss'</span><span class="s1">]</span>
+<span class="s1">val_loss = history_dict[</span><span class="s3">'val_loss'</span><span class="s1">]</span>
+
+<span class="s1">epochs = range(</span><span class="s4">1</span><span class="s1">, len(acc) + </span><span class="s4">1</span><span class="s1">)</span>
+
+<span class="s0"># &quot;bo&quot; is for &quot;blue dot&quot;</span>
+<span class="s1">plt.plot(epochs, loss, </span><span class="s3">'bo'</span><span class="s1">, label=</span><span class="s3">'Training loss'</span><span class="s1">)</span>
+<span class="s0"># b is for &quot;solid blue line&quot;</span>
+<span class="s1">plt.plot(epochs, val_loss, </span><span class="s3">'b'</span><span class="s1">, label=</span><span class="s3">'Validation loss'</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s3">'Training and validation loss'</span><span class="s1">)</span>
+<span class="s1">plt.xlabel(</span><span class="s3">'Epochs'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s3">'Loss'</span><span class="s1">)</span>
+<span class="s1">plt.legend()</span>
+
+<span class="s1">plt.show()</span>
+
+<span class="s0"># -- Accuracy</span>
+<span class="s1">plt.plot(epochs, acc, </span><span class="s3">'bo'</span><span class="s1">, label=</span><span class="s3">'Training acc'</span><span class="s1">)</span>
+<span class="s1">plt.plot(epochs, val_acc, </span><span class="s3">'b'</span><span class="s1">, label=</span><span class="s3">'Validation acc'</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s3">'Training and validation accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.xlabel(</span><span class="s3">'Epochs'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s3">'Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.legend(loc=</span><span class="s3">'lower right'</span><span class="s1">)</span>
+
+<span class="s1">plt.show()</span>
+
+<span class="s0">## Export the model</span>
+<span class="s1">export_model = tf.keras.Sequential([</span>
+    <span class="s1">vectorize_layer,</span>
+    <span class="s1">model,</span>
+    <span class="s1">layers.Activation(</span><span class="s3">'sigmoid'</span><span class="s1">)</span>
+<span class="s1">])</span>
+
+<span class="s1">export_model.compile(loss=losses.BinaryCrossentropy(from_logits=</span><span class="s2">False</span><span class="s1">),</span>
+                     <span class="s1">optimizer=</span><span class="s3">&quot;adam&quot;</span><span class="s1">,</span>
+                     <span class="s1">metrics=[</span><span class="s3">'accuracy'</span><span class="s1">])</span>
+
+<span class="s0"># Test it w/ `raw_test_ds`, which yields raw strings</span>
+<span class="s1">loss, accuracy = export_model.evaluate(raw_test_ds)</span>
+<span class="s1">print(accuracy)</span>
+
+<span class="s0">### Inference on new data</span>
+<span class="s1">examples = [</span>
+  <span class="s3">&quot;The movie was great!&quot;</span><span class="s1">,</span>
+  <span class="s3">&quot;The movie was okay.&quot;</span><span class="s1">,</span>
+  <span class="s3">&quot;The movie was terrible...&quot;</span>
+<span class="s1">]</span>
+
+<span class="s1">export_model.predict(examples)</span>
+
+</pre>
+</body>
+</html>

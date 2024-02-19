@@ -1,0 +1,258 @@
+<html>
+<head>
+<title>Vision_FE-FT.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #8c8c8c; font-style: italic;}
+.s1 { color: #080808;}
+.s2 { color: #0033b3;}
+.s3 { color: #067d17;}
+.s4 { color: #1750eb;}
+.s5 { color: #0037a6;}
+</style>
+</head>
+<body bgcolor="#ffffff">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#c0c0c0" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+Vision_FE-FT.py</font>
+</center></td></tr></table>
+<pre><span class="s0"># From: https://www.tensorflow.org/tutorials/images/transfer_learning</span>
+
+<span class="s2">import </span><span class="s1">matplotlib.pyplot </span><span class="s2">as </span><span class="s1">plt</span>
+<span class="s2">import </span><span class="s1">numpy </span><span class="s2">as </span><span class="s1">np</span>
+<span class="s2">import </span><span class="s1">os</span>
+<span class="s2">import </span><span class="s1">tensorflow </span><span class="s2">as </span><span class="s1">tf</span>
+
+<span class="s0">## Data preprocessing</span>
+<span class="s0">### Data download</span>
+<span class="s1">_URL = </span><span class="s3">'https://storage.googleapis.com/mledu-datasets/cats_and_dogs_filtered.zip'</span>
+<span class="s1">path_to_zip = tf.keras.utils.get_file(</span><span class="s3">'cats_and_dogs.zip'</span><span class="s1">, origin=_URL, extract=</span><span class="s2">True</span><span class="s1">)</span>
+<span class="s1">PATH = os.path.join(os.path.dirname(path_to_zip), </span><span class="s3">'cats_and_dogs_filtered'</span><span class="s1">)</span>
+
+<span class="s1">train_dir = os.path.join(PATH, </span><span class="s3">'train'</span><span class="s1">)</span>
+<span class="s1">validation_dir = os.path.join(PATH, </span><span class="s3">'validation'</span><span class="s1">)</span>
+
+<span class="s1">BATCH_SIZE = </span><span class="s4">32</span>
+<span class="s1">IMG_SIZE = (</span><span class="s4">160</span><span class="s1">, </span><span class="s4">160</span><span class="s1">)</span>
+
+<span class="s1">train_dataset = tf.keras.utils.image_dataset_from_directory(train_dir,</span>
+                                                            <span class="s1">shuffle=</span><span class="s2">True</span><span class="s1">,</span>
+                                                            <span class="s1">batch_size=BATCH_SIZE,</span>
+                                                            <span class="s1">image_size=IMG_SIZE)</span>
+
+<span class="s1">validation_dataset = tf.keras.utils.image_dataset_from_directory(validation_dir,</span>
+                                                                 <span class="s1">shuffle=</span><span class="s2">True</span><span class="s1">,</span>
+                                                                 <span class="s1">batch_size=BATCH_SIZE,</span>
+                                                                 <span class="s1">image_size=IMG_SIZE)</span>
+
+<span class="s1">class_names = train_dataset.class_names</span>
+
+<span class="s1">plt.figure(figsize=(</span><span class="s4">10</span><span class="s1">, </span><span class="s4">10</span><span class="s1">))</span>
+<span class="s2">for </span><span class="s1">images, labels </span><span class="s2">in </span><span class="s1">train_dataset.take(</span><span class="s4">1</span><span class="s1">):</span>
+    <span class="s2">for </span><span class="s1">i </span><span class="s2">in </span><span class="s1">range(</span><span class="s4">9</span><span class="s1">):</span>
+        <span class="s1">ax = plt.subplot(</span><span class="s4">3</span><span class="s1">, </span><span class="s4">3</span><span class="s1">, i + </span><span class="s4">1</span><span class="s1">)</span>
+        <span class="s1">plt.imshow(images[i].numpy().astype(</span><span class="s3">&quot;uint8&quot;</span><span class="s1">))</span>
+        <span class="s1">plt.title(class_names[labels[i]])</span>
+        <span class="s1">plt.axis(</span><span class="s3">&quot;off&quot;</span><span class="s1">)</span>
+
+    <span class="s1">val_batches = tf.data.experimental.cardinality(validation_dataset)</span>
+    <span class="s1">test_dataset = validation_dataset.take(val_batches // </span><span class="s4">5</span><span class="s1">)</span>
+    <span class="s1">validation_dataset = validation_dataset.skip(val_batches // </span><span class="s4">5</span><span class="s1">)</span>
+
+    <span class="s1">print(</span><span class="s3">'Number of validation batches: %d' </span><span class="s1">% tf.data.experimental.cardinality(validation_dataset))</span>
+    <span class="s1">print(</span><span class="s3">'Number of test batches: %d' </span><span class="s1">% tf.data.experimental.cardinality(test_dataset))</span>
+
+<span class="s0">### Configure the dataset for performance</span>
+<span class="s1">AUTOTUNE = tf.data.AUTOTUNE</span>
+
+<span class="s1">train_dataset = train_dataset.prefetch(buffer_size=AUTOTUNE)</span>
+<span class="s1">validation_dataset = validation_dataset.prefetch(buffer_size=AUTOTUNE)</span>
+<span class="s1">test_dataset = test_dataset.prefetch(buffer_size=AUTOTUNE)</span>
+
+<span class="s0">### Use data augmentation</span>
+<span class="s1">data_augmentation = tf.keras.Sequential([</span>
+    <span class="s1">tf.keras.layers.RandomFlip(</span><span class="s3">'horizontal'</span><span class="s1">),</span>
+    <span class="s1">tf.keras.layers.RandomRotation(</span><span class="s4">0.2</span><span class="s1">)</span>
+<span class="s1">])</span>
+
+<span class="s2">for </span><span class="s1">image, _ </span><span class="s2">in </span><span class="s1">train_dataset.take(</span><span class="s4">1</span><span class="s1">):</span>
+    <span class="s1">plt.figure(figsize=(</span><span class="s4">10</span><span class="s1">, </span><span class="s4">10</span><span class="s1">))</span>
+    <span class="s1">first_image = image[</span><span class="s4">0</span><span class="s1">]</span>
+    <span class="s2">for </span><span class="s1">i </span><span class="s2">in </span><span class="s1">range(</span><span class="s4">9</span><span class="s1">):</span>
+        <span class="s1">ax = plt.subplot(</span><span class="s4">3</span><span class="s1">, </span><span class="s4">3</span><span class="s1">, i + </span><span class="s4">1</span><span class="s1">)</span>
+        <span class="s1">augmented_image = data_augmentation(tf.expand_dims(first_image, </span><span class="s4">0</span><span class="s1">))</span>
+        <span class="s1">plt.imshow(augmented_image[</span><span class="s4">0</span><span class="s1">] / </span><span class="s4">255</span><span class="s1">)</span>
+        <span class="s1">plt.axis(</span><span class="s3">'off'</span><span class="s1">)</span>
+
+<span class="s0">### Rescale pixel values</span>
+<span class="s1">preprocess_input = tf.keras.applications.mobilenet_v2.preprocess_input</span>
+<span class="s1">rescale = tf.keras.layers.Rescaling(</span><span class="s4">1</span><span class="s1">/</span><span class="s4">127.5</span><span class="s1">, offset=-</span><span class="s4">1</span><span class="s1">)</span>
+
+<span class="s0">## Create the base model from the pre-trained ConvNets</span>
+<span class="s0"># Create the base model from the pre-trained model MobileNet V2</span>
+<span class="s1">IMG_SHAPE = IMG_SIZE + (</span><span class="s4">3</span><span class="s1">,)</span>
+<span class="s1">base_model = tf.keras.applications.MobileNetV2(input_shape=IMG_SHAPE, weights=</span><span class="s3">'imagenet'</span><span class="s1">, include_top=</span><span class="s2">False</span><span class="s1">)</span>
+
+<span class="s1">image_batch, label_batch = next(iter(train_dataset))</span>
+<span class="s1">feature_batch = base_model(image_batch)</span>
+<span class="s1">print(feature_batch.shape)</span>
+
+<span class="s0">## Feature Extraction</span>
+<span class="s0">### Freeze the convolutional base</span>
+<span class="s1">base_model.trainable = </span><span class="s2">False</span>
+
+<span class="s0">### Important note about the BatchNormalization layers</span>
+<span class="s0"># Let's take a look at the base model architecture</span>
+<span class="s1">base_model.summary()</span>
+
+<span class="s0">### Add a classification head</span>
+<span class="s1">global_average_layer = tf.keras.layers.GlobalAveragePooling2D()</span>
+<span class="s1">feature_batch_average = global_average_layer(feature_batch)</span>
+<span class="s1">print(feature_batch_average.shape)</span>
+
+<span class="s1">prediction_layer = tf.keras.layers.Dense(</span><span class="s4">1</span><span class="s1">)</span>
+<span class="s1">prediction_batch = prediction_layer(feature_batch_average)</span>
+<span class="s1">print(prediction_batch.shape)</span>
+
+<span class="s1">inputs = tf.keras.Input(shape=(</span><span class="s4">160</span><span class="s1">, </span><span class="s4">160</span><span class="s1">, </span><span class="s4">3</span><span class="s1">))</span>
+<span class="s1">x = data_augmentation(inputs)</span>
+<span class="s1">x = preprocess_input(x)</span>
+<span class="s1">x = base_model(x, training=</span><span class="s2">False</span><span class="s1">)</span>
+<span class="s1">x = global_average_layer(x)</span>
+<span class="s1">x = tf.keras.layers.Dropout(</span><span class="s4">0.2</span><span class="s1">)(x)</span>
+<span class="s1">outputs = prediction_layer(x)</span>
+<span class="s1">model = tf.keras.Model(inputs, outputs)</span>
+
+<span class="s1">model.summary()</span>
+
+<span class="s1">len(model.trainable_variables)</span>
+
+<span class="s0"># tf.keras.utils.plot_model(model, show_shapes=True)</span>
+
+<span class="s0">### Compile the model</span>
+<span class="s1">base_learning_rate = </span><span class="s4">0.0001</span>
+<span class="s1">model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=</span><span class="s2">True</span><span class="s1">),</span>
+              <span class="s1">optimizer=tf.keras.optimizers.Adam(learning_rate=base_learning_rate),</span>
+              <span class="s1">metrics=[tf.keras.metrics.BinaryAccuracy(threshold=</span><span class="s4">0</span><span class="s1">, name=</span><span class="s3">'accuracy'</span><span class="s1">)])</span>
+
+<span class="s0">### Train the model</span>
+<span class="s1">initial_epochs = </span><span class="s4">10</span>
+<span class="s1">loss0, accuracy0 = model.evaluate(validation_dataset)</span>
+
+<span class="s1">print(</span><span class="s3">&quot;initial loss: {:.2f}&quot;</span><span class="s1">.format(loss0))</span>
+<span class="s1">print(</span><span class="s3">&quot;initial accuracy: {:.2f}&quot;</span><span class="s1">.format(accuracy0))</span>
+
+<span class="s1">history = model.fit(train_dataset,</span>
+                    <span class="s1">epochs=initial_epochs,</span>
+                    <span class="s1">validation_data=validation_dataset)</span>
+
+<span class="s0">### Learning curves</span>
+<span class="s1">acc = history.history[</span><span class="s3">'accuracy'</span><span class="s1">]</span>
+<span class="s1">val_acc = history.history[</span><span class="s3">'val_accuracy'</span><span class="s1">]</span>
+
+<span class="s1">loss = history.history[</span><span class="s3">'loss'</span><span class="s1">]</span>
+<span class="s1">val_loss = history.history[</span><span class="s3">'val_loss'</span><span class="s1">]</span>
+
+<span class="s1">plt.figure(figsize=(</span><span class="s4">8</span><span class="s1">, </span><span class="s4">8</span><span class="s1">))</span>
+<span class="s1">plt.subplot(</span><span class="s4">2</span><span class="s1">, </span><span class="s4">1</span><span class="s1">, </span><span class="s4">1</span><span class="s1">)</span>
+<span class="s1">plt.plot(acc, label=</span><span class="s3">'Training Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.plot(val_acc, label=</span><span class="s3">'Validation Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.legend(loc=</span><span class="s3">'lower right'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s3">'Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.ylim([min(plt.ylim()), </span><span class="s4">1</span><span class="s1">])</span>
+<span class="s1">plt.title(</span><span class="s3">'Training &amp; Validation Accuracy'</span><span class="s1">)</span>
+
+<span class="s1">plt.subplot(</span><span class="s4">2</span><span class="s1">, </span><span class="s4">1</span><span class="s1">, </span><span class="s4">2</span><span class="s1">)</span>
+<span class="s1">plt.plot(loss, label=</span><span class="s3">'Training Loss'</span><span class="s1">)</span>
+<span class="s1">plt.plot(val_loss, label=</span><span class="s3">'Validation Loss'</span><span class="s1">)</span>
+<span class="s1">plt.legend(loc=</span><span class="s3">'upper right'</span><span class="s1">)</span>
+<span class="s1">plt.ylabel(</span><span class="s3">'Cross Entropy'</span><span class="s1">)</span>
+<span class="s1">plt.ylim([</span><span class="s4">0</span><span class="s1">, </span><span class="s4">1.0</span><span class="s1">])</span>
+<span class="s1">plt.title(</span><span class="s3">'Training &amp; Validation Loss'</span><span class="s1">)</span>
+<span class="s1">plt.xlabel(</span><span class="s3">'epoch'</span><span class="s1">)</span>
+<span class="s1">plt.show()</span>
+
+<span class="s0">## Fine tuning</span>
+<span class="s0">### Un-freeze the top layers of the model</span>
+<span class="s1">base_model.trainable = </span><span class="s2">True</span>
+
+<span class="s0"># Let's take a look to see how many layers are in the base model</span>
+<span class="s1">print(</span><span class="s3">&quot;Number of layers in the base model: &quot;</span><span class="s1">, len(base_model.layers))</span>
+
+<span class="s0"># Fine-tue from this layer onwards</span>
+<span class="s1">fine_tune_at = </span><span class="s4">100</span>
+
+<span class="s0"># Freeze all the layers before the `fine_tune_at` layer</span>
+<span class="s2">for </span><span class="s1">layer </span><span class="s2">in </span><span class="s1">base_model.layers[:fine_tune_at]:</span>
+    <span class="s1">layer.trainable = </span><span class="s2">False</span>
+
+<span class="s0">### Compile the model</span>
+<span class="s1">model.compile(loss = tf.keras.losses.BinaryCrossentropy(from_logits=</span><span class="s2">True</span><span class="s1">),</span>
+              <span class="s1">optimizer = tf.keras.optimizers.RMSprop(learning_rate = base_learning_rate / </span><span class="s4">10</span><span class="s1">),</span>
+              <span class="s1">metrics = [tf.keras.metrics.BinaryAccuracy(threshold=</span><span class="s4">0</span><span class="s1">, name=</span><span class="s3">'accuracy'</span><span class="s1">)])</span>
+
+<span class="s1">model.summary()</span>
+
+<span class="s1">len(model.trainable_variables)</span>
+
+<span class="s0">### Continue training the model</span>
+<span class="s1">fine_tune_epochs = </span><span class="s4">10</span>
+<span class="s1">total_epochs = initial_epochs + fine_tune_epochs</span>
+
+<span class="s1">history_fine = model.fit(train_dataset,</span>
+                         <span class="s1">epochs=total_epochs,</span>
+                         <span class="s1">initial_epoch=history.epoch[-</span><span class="s4">1</span><span class="s1">],</span>
+                         <span class="s1">validation_data=validation_dataset)</span>
+
+<span class="s1">acc += history_fine.history[</span><span class="s3">'accuracy'</span><span class="s1">]</span>
+<span class="s1">val_acc += history_fine.history[</span><span class="s3">'val_accuracy'</span><span class="s1">]</span>
+
+<span class="s1">loss += history_fine.history[</span><span class="s3">'loss'</span><span class="s1">]</span>
+<span class="s1">val_loss += history_fine.history[</span><span class="s3">'val_loss'</span><span class="s1">]</span>
+
+<span class="s1">plt.figure(figsize=(</span><span class="s4">8</span><span class="s1">, </span><span class="s4">8</span><span class="s1">))</span>
+<span class="s1">plt.subplot(</span><span class="s4">2</span><span class="s1">, </span><span class="s4">1</span><span class="s1">, </span><span class="s4">1</span><span class="s1">)</span>
+<span class="s1">plt.plot(acc, label=</span><span class="s3">'Training Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.plot(val_acc, label=</span><span class="s3">'Validation Accuracy'</span><span class="s1">)</span>
+<span class="s1">plt.ylim([</span><span class="s4">0.8</span><span class="s1">, </span><span class="s4">1</span><span class="s1">])</span>
+<span class="s1">plt.plot([initial_epochs-</span><span class="s4">1</span><span class="s1">, initial_epochs-</span><span class="s4">1</span><span class="s1">],</span>
+         <span class="s1">plt.ylim(), label=</span><span class="s3">'Start Fine Tuning'</span><span class="s1">)</span>
+<span class="s1">plt.legend(loc=</span><span class="s3">'lower right'</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s3">'Training &amp; Validation Accuracy'</span><span class="s1">)</span>
+
+<span class="s1">plt.subplot(</span><span class="s4">2</span><span class="s1">, </span><span class="s4">1</span><span class="s1">, </span><span class="s4">2</span><span class="s1">)</span>
+<span class="s1">plt.plot(loss, label=</span><span class="s3">'Training Loss'</span><span class="s1">)</span>
+<span class="s1">plt.plot(val_loss, label=</span><span class="s3">'Validation Loss'</span><span class="s1">)</span>
+<span class="s1">plt.ylim([</span><span class="s4">0</span><span class="s1">, </span><span class="s4">1.0</span><span class="s1">])</span>
+<span class="s1">plt.plot([initial_epochs-</span><span class="s4">1</span><span class="s1">, initial_epochs-</span><span class="s4">1</span><span class="s1">],</span>
+         <span class="s1">plt.ylim(), label=</span><span class="s3">'Start Fine Tuning'</span><span class="s1">)</span>
+<span class="s1">plt.legend(loc=</span><span class="s3">'upper right'</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s3">'Taining &amp; Valdiation Loss'</span><span class="s1">)</span>
+<span class="s1">plt.xlabel(</span><span class="s3">'epoch'</span><span class="s1">)</span>
+<span class="s1">plt.show()</span>
+
+<span class="s0">### Evaluation and prediction</span>
+<span class="s1">loss, accuracy = model.evaluate(test_dataset)</span>
+<span class="s1">print(</span><span class="s3">'Test accuracy:'</span><span class="s1">, accuracy)</span>
+
+<span class="s0"># Retrieve a batch of images from the test set</span>
+<span class="s1">image_batch, label_batch = test_dataset.as_numpy_iterator().next()</span>
+<span class="s1">predictions = model.predict_on_batch(image_batch).flatten()</span>
+
+<span class="s0"># Apply a sigmoid since our model returns logits</span>
+<span class="s1">predictions = tf.nn.sigmoid(predictions)</span>
+<span class="s1">predictions = tf.where(predictions &lt; </span><span class="s4">0.5</span><span class="s1">, </span><span class="s4">0</span><span class="s1">, </span><span class="s4">1</span><span class="s1">)</span>
+
+<span class="s1">print(</span><span class="s3">'Predictions:</span><span class="s5">\n</span><span class="s3">'</span><span class="s1">, predictions.numpy())</span>
+<span class="s1">print(</span><span class="s3">'Labels:</span><span class="s5">\n</span><span class="s3">'</span><span class="s1">, label_batch)</span>
+
+<span class="s1">plt.figure(figsize=(</span><span class="s4">10</span><span class="s1">, </span><span class="s4">10</span><span class="s1">))</span>
+<span class="s2">for </span><span class="s1">i </span><span class="s2">in </span><span class="s1">range(</span><span class="s4">9</span><span class="s1">):</span>
+    <span class="s1">ax = plt.subplot(</span><span class="s4">3</span><span class="s1">, </span><span class="s4">3</span><span class="s1">, i + </span><span class="s4">1</span><span class="s1">)</span>
+    <span class="s1">plt.imshow(image_batch[i].astype(</span><span class="s3">&quot;uint8&quot;</span><span class="s1">))</span>
+    <span class="s1">plt.title(class_names[predictions[i]])</span>
+    <span class="s1">plt.axis(</span><span class="s3">&quot;off&quot;</span><span class="s1">)</span>
+</pre>
+</body>
+</html>
